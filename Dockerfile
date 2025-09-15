@@ -5,7 +5,7 @@ FROM openjdk:17-jdk-slim
 WORKDIR /app
 
 # Copy the JAR file into the container
-ADD /target/CarWoosh-0.0.1-SNAPSHOT.jar carwoosh.jar
+COPY /target/CarWoosh-0.0.1-SNAPSHOT.jar /app/carwoosh.jar
 
 # Set the entrypoint to run the JAR file
 ENTRYPOINT ["java", "-jar", "carwoosh.jar"]
