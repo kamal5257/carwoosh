@@ -21,6 +21,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.carwoosh.base.BaseResponse;
 import com.carwoosh.constant.APPServiceCode;
@@ -95,6 +96,12 @@ public class UserService {
 		userDetails.put("role", userOpt.getRole().name());
 		userDetails.put("profilePic", userOpt.getProfileImageUrl());
 		userDetails.put("mobileNumber", userOpt.getMobileNumber());
+		
+		// ✅ Build absolute image URL
+	    if (userOpt.getProfileImageUrl() != null && userOpt.getProfileImageUrl().startsWith("/uploads")) {
+	        String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+	        userOpt.setProfileImageUrl(baseUrl + userOpt.getProfileImageUrl());
+	    }
 
 		// ✅ Include vehicle info (if available)
 		List<Vehicle> vehicles = userOpt.getVehicles();
@@ -301,28 +308,41 @@ public class UserService {
 	    String username = jwtUtil.extractUsername(token);
 	    User user = userRepository.findByUserName(username);
 
-	    // Define upload folder (inside static folder or a served uploads directory)
-	    String uploadDirPath = "uploads"; // relative path inside project root
+	    if (file.isEmpty()) {
+	        response.setStatusCode("APP_902");
+	        response.setMessage("File is empty");
+	        return response;
+	    }
+
+	    // ✅ Create uploads folder inside project root
+	    String uploadDirPath = "uploads";
 	    File uploadDir = new File(uploadDirPath);
 	    if (!uploadDir.exists()) uploadDir.mkdirs();
 
-	    // Generate unique file name
-	    String fileName = "user_" + user.getId() + "_" + System.currentTimeMillis() + "_profile";
+	    // ✅ Preserve extension (important for browser display)
+	    String originalFileName = file.getOriginalFilename();
+	    String extension = "";
+	    if (originalFileName != null && originalFileName.contains(".")) {
+	        extension = originalFileName.substring(originalFileName.lastIndexOf("."));
+	    }
+
+	    String fileName = "user_" + user.getId() + "_" + System.currentTimeMillis() + extension;
 	    Path filePath = Paths.get(uploadDirPath, fileName);
 
-	    // Save file
+	    // ✅ Save file
 	    Files.write(filePath, file.getBytes());
 
-	    // Save relative URL instead of absolute path
+	    // ✅ Save relative URL
 	    String relativeUrl = "/uploads/" + fileName;
 	    user.setProfileImageUrl(relativeUrl);
 	    userRepository.save(user);
 
 	    response.setStatusCode(APPServiceCode.APP_001.getStatusCode());
-	    response.setMessage(APPServiceCode.APP_001.getStatusDesc());
+	    response.setMessage(APPServiceCode.APP_001.getStatusDesc());	    
 
 	    return response;
 	}
+
 
 
 	public BaseResponse<Object> updateProfilePicture(HttpServletRequest request, MultipartFile file)
