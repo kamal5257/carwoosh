@@ -3,9 +3,6 @@ package com.carwoosh.services;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -297,6 +294,7 @@ public class UserService {
 	    logger.info("INSIDE SERVICE -->> UPLOAD PIC");
 	    BaseResponse<Object> response = new BaseResponse<>();
 
+	    // ✅ Authorization check
 	    String authHeader = request.getHeader("Authorization");
 	    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
 	        response.setStatusCode("APP_909");
@@ -314,27 +312,32 @@ public class UserService {
 	        return response;
 	    }
 
-	    // ✅ Create uploads folder inside project root
-	    String uploadDirPath = "uploads";
-	    File uploadDir = new File(uploadDirPath);
-	    if (!uploadDir.exists()) uploadDir.mkdirs();
-
-	    // ✅ Preserve extension (important for browser display)
-	    String originalFileName = file.getOriginalFilename();
-	    String extension = "";
-	    if (originalFileName != null && originalFileName.contains(".")) {
-	        extension = originalFileName.substring(originalFileName.lastIndexOf("."));
+	    // ✅ Validate MIME type
+	    String contentType = file.getContentType();
+	    if (contentType ==null) {
+	        response.setStatusCode("APP_903");
+	        response.setMessage("Invalid file type");
+	        return response;
 	    }
 
-	    String fileName = "user_" + user.getId() + "_" + System.currentTimeMillis() + extension;
-	    Path filePath = Paths.get(uploadDirPath, fileName);
+	    // ✅ Upload to Supabase
+	    SupabaseStorageService supabaseService = new SupabaseStorageService();
+	    String publicUrl;
+	    try {
+	        publicUrl = supabaseService.uploadProfileImage(
+	                file.getBytes(),
+	                file.getOriginalFilename(),
+	                contentType
+	        );
+	    } catch (IOException e) {
+	        logger.error("Error uploading file to Supabase", e);
+	        response.setStatusCode("APP_904");
+	        response.setMessage("Failed to upload file");
+	        return response;
+	    }
 
-	    // ✅ Save file
-	    Files.write(filePath, file.getBytes());
-
-	    // ✅ Save relative URL
-	    String relativeUrl = "/uploads/" + fileName;
-	    user.setProfileImageUrl(relativeUrl);
+	    // ✅ Save public URL to user
+	    user.setProfileImageUrl(publicUrl);
 	    userRepository.save(user);
 
 	    response.setStatusCode(APPServiceCode.APP_001.getStatusCode());
@@ -342,6 +345,7 @@ public class UserService {
 
 	    return response;
 	}
+
 
 
 

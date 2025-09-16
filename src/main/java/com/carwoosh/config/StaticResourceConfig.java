@@ -11,7 +11,7 @@ public class StaticResourceConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // Serve /uploads/** URLs from the "uploads" folder in project root
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:uploads/")
+                .addResourceLocations("file:/uploads/")
                 .setCachePeriod(3600); // optional cache in seconds
     }
 }
