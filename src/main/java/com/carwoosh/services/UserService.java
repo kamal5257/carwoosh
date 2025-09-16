@@ -286,41 +286,44 @@ public class UserService {
 		return response;
 	}
 
-	public BaseResponse<Object> uploadProfilePicture(HttpServletRequest request, MultipartFile file)
-			throws IOException {
+	public BaseResponse<Object> uploadProfilePicture(HttpServletRequest request, MultipartFile file) throws IOException {
+	    logger.info("INSIDE SERVICE -->> UPLOAD PIC");
+	    BaseResponse<Object> response = new BaseResponse<>();
 
-		logger.error("INSIDE SERVICE -->> UPLOAD PIC");
-		BaseResponse<Object> response = new BaseResponse<>();
+	    String authHeader = request.getHeader("Authorization");
+	    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+	        response.setStatusCode("APP_909");
+	        response.setMessage("Missing or invalid token");
+	        return response;
+	    }
 
-		String authHeader = request.getHeader("Authorization");
-		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-			response.setStatusCode("APP_909");
-			response.setMessage("Missing or invalid token");
-		}
+	    String token = authHeader.substring(7);
+	    String username = jwtUtil.extractUsername(token);
+	    User user = userRepository.findByUserName(username);
 
-		String token = authHeader.substring(7);
-		String username = jwtUtil.extractUsername(token);
+	    // Define upload folder (inside static folder or a served uploads directory)
+	    String uploadDirPath = "uploads"; // relative path inside project root
+	    File uploadDir = new File(uploadDirPath);
+	    if (!uploadDir.exists()) uploadDir.mkdirs();
 
-		User user = userRepository.findByUserName(username);
+	    // Generate unique file name
+	    String fileName = "user_" + user.getId() + "_" + System.currentTimeMillis() + "_profile";
+	    Path filePath = Paths.get(uploadDirPath, fileName);
 
-		// Ensure Upload Folder Exist
-		File uploadDir = new File(UPLOAD_DIR);
-		if (!uploadDir.exists())
-			uploadDir.mkdirs();
+	    // Save file
+	    Files.write(filePath, file.getBytes());
 
-		// Save File
-		String fileName = "user_" + user.getId() + "_" + System.currentTimeMillis() + "_" + file.getOriginalFilename();
-		Path filePath = Paths.get(UPLOAD_DIR, fileName);
-		Files.write(filePath, file.getBytes());
+	    // Save relative URL instead of absolute path
+	    String relativeUrl = "/uploads/" + fileName;
+	    user.setProfileImageUrl(relativeUrl);
+	    userRepository.save(user);
 
-		// update user record
-		user.setProfileImageUrl(filePath.toString());
-		userRepository.save(user);
-		response.setMessage(APPServiceCode.APP_001.getStatusDesc());
-		response.setStatusCode(APPServiceCode.APP_001.getStatusCode());
+	    response.setStatusCode(APPServiceCode.APP_001.getStatusCode());
+	    response.setMessage(APPServiceCode.APP_001.getStatusDesc());
 
-		return response;
+	    return response;
 	}
+
 
 	public BaseResponse<Object> updateProfilePicture(HttpServletRequest request, MultipartFile file)
 			throws IOException {
